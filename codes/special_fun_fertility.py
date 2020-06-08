@@ -392,6 +392,66 @@ def calculate_mean_sd_groupby_dissection(df,manfest_df,grp_cols,day_pos,days=['d
     return listofvar
 
 
+def calculate_mean_sd_groupby_mossifeed(df,manfest_df,grp_cols,day_pos,days=['d0','d13']):
+
+    ''' We are going to calculate mean and SD of slected columns '''
+    df_log=np.log2(df)
+    tmp_mn=pd.DataFrame(index=df.index)
+    tmp_var=pd.DataFrame(index=df.index)
+    tmp_mn_log=pd.DataFrame(index=df.index)
+    ###
+    final_mean=pd.DataFrame(index=df.index)
+    final_CV=pd.DataFrame(index=df.index)
+    df_sample=pd.DataFrame(index=['num'])
+
+    vars=manfest_df['dr'].unique().tolist()
+    vars.remove('NA')
+    ### get columns that contains
+
+    ###
+
+    grp_cols.remove('mf')
+
+    grp_cols.remove('b')
+    for k,v in manfest_df.groupby(grp_cols).indices.items():
+        if k[day_pos]in days:
+            key='_'.join(k)
+
+            tmp_mani=manfest_df.iloc[v].copy()
+
+            for dr,dr_v in tmp_mani.groupby([ 'b','mf']).indices.items():
+
+                dr='_'.join(dr)
+                tmp_mn[key+'_'+dr]=df[tmp_mani.index[dr_v]].mean(axis=1).copy()
+                tmp_var[key+'_'+dr]=df[tmp_mani.index[dr_v]].var(axis=1).copy()
+                ### check whether there is zero variance
+                # tmp_var[tmp_var<1e-10]=1e-10;
+                tmp_mn_log[key+'_'+dr]=df_log[tmp_mani.index[dr_v]].mean(axis=1).copy()
+                df_sample[key+'_'+dr]=tmp_mani.index[dr_v].shape[0]
+            [mean_df,sd_max,var_max]=getCombined_mean_variance(tmp_mn,tmp_var,df_sample)
+
+            # [mean_df,sd_max,var_max]=weighted_mean_variance(tmp_mn_log,tmp_var)
+            final_mean[key]=np.log2(mean_df.copy())
+            final_CV[key]=np.square(sd_max.copy()/mean_df.copy())
+
+
+            # we are going to apply weighted varaiance analysis
+            # tmp_sd[key]=np.square((df[manfest_df.index[v]].std(axis=1).copy())/(df[manfest_df.index[v]].mean(axis=1).copy()))
+            # print('hello',manfest_df.iloc[v,:])
+
+
+
+    listofvar=[]
+    for day in days:
+        day0_cols=final_mean.columns[final_mean.columns.str.contains(day)]
+        d0_df_mean,d0_df_sd=multi_to_one_df(final_mean,final_CV,day0_cols,day=day)
+        listofvar.append(d0_df_mean.copy())
+        listofvar.append(d0_df_sd.copy())
+
+    # day13_cols=tmp_mn.columns[tmp_mn.columns.str.contains(days[1])]
+    # d13_df_mean,d13_df_sd=multi_to_one_df(tmp_mn_log,tmp_sd,day13_cols,day=days[1])
+
+    return listofvar
 
 def getCombined_mean_variance(df_m,df_var,df_sample):
     ''' We are going to combine mean and variance '''
@@ -847,7 +907,36 @@ def error_analysis(df,manfest_df,prev_to_new,db_df,plot_info=None):
     #### combine disection and PCR error
     # fig = go.Figure()
     ### we are going to plot errors
-    fig = make_subplots(rows=5, cols=2,subplot_titles=("PCR error", "Distribution", "PCR error","Distribution", "Blood input error", "Distribution", "Dissection error","Distribution","Cuvette error", "Distribution"))
+
+    ## we would like to perform mossifeed error
+    grp_cols=['sex','d','mf','dr','b','t']
+    day_pos=grp_cols.index('d')
+    days=['d0']
+    listofvar_feed=calculate_mean_sd_groupby_mossifeed(rel_df,manfest_df,grp_cols,day_pos,days)
+    d13_df_mean,d13_df_sd=listofvar_feed[0],listofvar_feed[1]
+    df_m=d13_df_mean[d13_df_mean['d0_mean']<-10].copy()
+    df_s=d13_df_sd[d13_df_mean['d0_mean']<-10].copy()
+    feed_traces=plot_dissection_error(d13_df_mean,d13_df_sd,days,col='red')
+
+
+    trace_bi=plot_dissection_error(df_m,df_s,days,col='red')
+    fig1 = make_subplots(rows=1, cols=1,subplot_titles=("Blood input error"))
+    df_m=d13_df_mean[d13_df_mean['d0_mean']<-10].copy()
+    df_s=d13_df_sd[d13_df_mean['d0_mean']<-10].copy()
+
+    cmb_df=pd.concat([df_m,df_s],axis=1)
+    cmb_df.to_csv('filtered genes and conditions.csv',sep='\t',index=None)
+    fig1.append_trace(trace_bi[0],row=1, col=1)
+    fig1.update_yaxes(title_text="relative error (CV*CV)",row=1, col=1)
+    fig1.update_xaxes(title_text="log2 (relative abundance or count)", row=1, col=1)
+    fig1.show()
+    import pdb;pdb.set_trace()  
+    # fig.append_trace(trace_bi[1],row=6, col=1)
+    # fig.append_trace(trace_bi[2],row=6, col=2)
+
+
+    fig = make_subplots(rows=6, cols=2,subplot_titles=("PCR error", "Distribution", "PCR error","Distribution", "Blood input error", "Distribution",
+    "Dissection error","Distribution","Cuvette error", "Distribution","Mosquito feed error", "Distribution"))
 
     fig.append_trace(pcr_traces[0],row=1, col=1)
 
@@ -856,6 +945,7 @@ def error_analysis(df,manfest_df,prev_to_new,db_df,plot_info=None):
     fig.append_trace(pcr_traces[2],row=2, col=1)
     fig.append_trace(pcr_traces[3],row=2, col=1)
     fig.append_trace(pcr_traces[5],row=2, col=2)
+
 
     fig.append_trace(blood_traces[0],row=3, col=1)
     fig.append_trace(blood_traces[1],row=3, col=1)
@@ -871,18 +961,24 @@ def error_analysis(df,manfest_df,prev_to_new,db_df,plot_info=None):
     fig.append_trace(tube_traces[1],row=5, col=1)
     fig.append_trace(tube_traces[2],row=5, col=2)
 
+    fig.append_trace(feed_traces[0],row=6, col=1)
+    fig.append_trace(feed_traces[1],row=6, col=1)
+    fig.append_trace(feed_traces[2],row=6, col=2)
+
     # Update xaxis properties
     fig.update_yaxes(title_text="relative error (CV*CV)",row=1, col=1,range=[0,1.6])
     fig.update_yaxes(title_text="relative error (CV*CV)",row=2, col=1,range=[0,1.6])
     fig.update_yaxes(title_text="relative error (CV*CV)"    ,row=3, col=1,range=[0,1.6])
     fig.update_yaxes(title_text="relative error (CV*CV)"    ,row=4, col=1,range=[0,1.6])
     fig.update_yaxes(title_text="relative error (CV*CV)"    ,row=5, col=1,range=[0,1.6])
+    fig.update_yaxes(title_text="relative error (CV*CV)"    ,row=6, col=1,range=[0,1.6])
 
     fig.update_yaxes(title_text="Frequency"    ,row=1, col=2)
     fig.update_yaxes(title_text="Frequency"     ,row=2, col=2)
     fig.update_yaxes(title_text="Frequency"    ,row=3, col=2)
     fig.update_yaxes(title_text="Frequency"     ,row=4, col=2)
     fig.update_yaxes(title_text="Frequency"     ,row=5, col=2)
+    fig.update_yaxes(title_text="Frequency"     ,row=6, col=2)
 
     # Update yaxis properties
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=1, col=1,range=[-16,0])
@@ -890,19 +986,20 @@ def error_analysis(df,manfest_df,prev_to_new,db_df,plot_info=None):
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=3, col=1,range=[-16,0])
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=4, col=1,range=[-16,0])
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=5, col=1,range=[-16,0])
+    fig.update_xaxes(title_text="log2 (relative abundance or count)", row=6, col=1,range=[-16,0])
 
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=1, col=2,range=[-16,0])
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=2, col=2,range=[-16,0])
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=3, col=2,range=[-16,0])
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=4, col=2,range=[-16,0])
     fig.update_xaxes(title_text="log2 (relative abundance or count)", row=5, col=2,range=[-16,0])
-
+    fig.update_xaxes(title_text="log2 (relative abundance or count)", row=6, col=2,range=[-16,0])
 
     fig.update_layout(height=2700, width=1200, title_text="Diffrent types of error analysis")
     fig.show()
 
 
-    import pdb;pdb.set_trace()
+
 
 
 
