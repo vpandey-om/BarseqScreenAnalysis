@@ -59,8 +59,10 @@ def preprocessing(manifests_df,count_df):
 
     ## this code is ngi to sample
 
+
     final_df=pd.DataFrame(index=req_df.index,columns=['Gene',  'Barcodes','pbanka_id'])
     final_df.loc[:,['Gene',  'Barcodes','pbanka_id']]= req_df.loc[:,['Gene',  'Barcodes','pbanka_id']].copy()
+    final_df_des=final_df.copy()
     final_df_two_read=pd.DataFrame(index=req_df.index,columns=['Gene',  'Barcodes','pbanka_id'])
     final_df_two_read.loc[:,['Gene',  'Barcodes','pbanka_id']]= req_df.loc[:,['Gene',  'Barcodes','pbanka_id']].copy()
     sample_to_read={} ### this is the dictionary where we will map the reads
@@ -76,24 +78,27 @@ def preprocessing(manifests_df,count_df):
            final_df.loc[:,ngi]=req_df.loc[:,two_reads].mean(axis=1)
            # final_df_two_read[ngi+'.read1']=np.nan()
            # final_df_two_read[ngi+'.read2']=np.nan()
+           final_df_des.loc[:,sam]=req_df.loc[:,two_reads].mean(axis=1)
            final_df_two_read.loc[:,sam+'.read1']=req_df.loc[:,two_reads[0]]
            final_df_two_read.loc[:,sam+'.read2']=req_df.loc[:,two_reads[1]]
        elif len(two_reads)==1:
            # final_df[ngi]=np.nan()
            final_df.loc[:,ngi]=req_df.loc[:,two_reads].copy()
+           final_df_des.loc[:,sam]=req_df.loc[:,two_reads].copy()
            print('Please check there is only one reads for the sample: %s'%ngi)
        else:
            print('Number of reads are mismatched for the sample: %s'%ngi)
 
-    return final_df,final_df_two_read,manifests_df
+    return final_df,final_df_des,final_df_two_read,manifests_df
 
 
 
 
-def filter_input_dropout(df,df_read,input_df,manfest_df,percent=0.9,rel_cut=1e-5,day0='d0'):
+def filter_input_dropout(df,df_s,df_read,input_df,manfest_df,percent=0.9,rel_cut=1e-5,day0='d0'):
     ''' We are going to find dropouts as well as how many we can map to inputs'''
     ########## input parameters
     # df: original count dataframe (read1+ read2)
+    # df_s : df with header description
     # df_read is dtaframe when reads are sperated
     # input_df: This is the DATAFRAME  which one used as a input for pools
     # manfest_df: manifests dtaframe
@@ -160,7 +165,10 @@ def filter_input_dropout(df,df_read,input_df,manfest_df,percent=0.9,rel_cut=1e-5
     filtered_count_df=filtered_count_df.drop(contaminated_genes)
     filtered_df_read=filtered_df_read.drop(contaminated_genes)
 
-    return filtered_count_df,filtered_df_read
+    df_s.set_index('pbanka_id',inplace=True)
+    filltered_df_s=df_s.loc[filtered_count_df.index,:].copy()
+
+    return filtered_count_df,filtered_df_read,filltered_df_s
 
 
 def relative_abundance_analysis(df,manfest_df,prev_to_new,db_df,plot_info=None):
@@ -930,7 +938,7 @@ def error_analysis(df,manfest_df,prev_to_new,db_df,plot_info=None):
     fig1.update_yaxes(title_text="relative error (CV*CV)",row=1, col=1)
     fig1.update_xaxes(title_text="log2 (relative abundance or count)", row=1, col=1)
     fig1.show()
-    import pdb;pdb.set_trace()  
+    import pdb;pdb.set_trace()
     # fig.append_trace(trace_bi[1],row=6, col=1)
     # fig.append_trace(trace_bi[2],row=6, col=2)
 

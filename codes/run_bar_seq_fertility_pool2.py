@@ -32,9 +32,9 @@ def stepwiseAnalysis():
     ''' We are going do analyis of pool1 data of Claire '''
 
     ### these are the input files
-    manifests_df=pd.read_csv(data_folder+"/manifests_pool1.txt",sep='\t')
-    count_df=pd.read_csv(data_folder+ "/result_240120_barcode_counts_table.txt",sep='\t')
-    input_df=pd.read_csv(data_folder+'/input_vector.txt', sep='\t')
+    manifests_df=pd.read_csv(data_folder+"/manifest_pool2.txt",sep='\t')
+    count_df=pd.read_csv(data_folder+ "/barcode_counts_table_170620_pool2.txt",sep='\t')
+    input_df=pd.read_csv(data_folder+'/input_pool2.txt', sep='\t')
 
 
     #### end of the input section
@@ -49,16 +49,16 @@ def stepwiseAnalysis():
     filtered_count_df,filtered_df_read,filtered_count_df_des=filter_input_dropout(final_count_df,final_count_df_des,final_count_df_two_read,input_df,manfest_df,percent)
 
     ######  write filtered and unfiltered files
-    # final_count_df_two_read.to_csv(out_folder+"/unfilterd_count_matrix_pool1.txt",sep='\t')
-    filtered_count_df_des.to_csv(out_folder+"/filterd_count_matrix_pool1.txt",sep='\t')
+    # final_count_df_two_read.to_csv(out_folder+"/unfilterd_count_matrix_pool2.txt",sep='\t')
+    filtered_count_df_des.to_csv(out_folder+"/filterd_count_matrix_pool2.txt",sep='\t')
 
     ### we are going to perform relative abundance analysis
     ## prev_to_new this is the pickle information which is used when we change old to new ID
     ## db_df: this is the dataframe contains name and description
 
     ## if you we do not want to plot then plot_info=None
-    #plot_info={'pdf':out_folder+"/relative_abundance_of_pool1.pdf",'d':['d0','d13'],'mf':['mf1','mf2'],'sex':['GCKO2','g145480']}
-    plot_info=None
+    plot_info={'pdf':out_folder+"/relative_abundance_of_pool2.pdf",'d':['d0','d13'],'mf':['mf1','mf2'],'sex':['GCKO2','g145480']}
+    # plot_info=None
     relative_abundance_analysis(filtered_count_df,manfest_df,prev_to_new,db_df,plot_info)
 
     ## we will do diffrent kind of error analysis
